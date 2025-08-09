@@ -146,13 +146,49 @@ async function streamOpenAIChat({
       }
       try {
         const json = JSON.parse(data)
-        // OpenAI chat stream delta
-        const delta = json?.choices?.[0]?.delta?.content ?? ""
+        // Support both chat (delta.content) and completions (text) streaming formats
+        const delta = json?.choices?.[0]?.delta?.content ?? json?.choices?.[0]?.text ?? ""
         if (delta) onToken(delta)
       } catch {
         // ignore parse errors on keep-alive lines
       }
     }
+  }
+}
+
+// Non-streaming fallback for OpenAI chat/completions
+async function nonStreamOpenAIChat({
+  payload,
+  baseUrl,
+  signal,
+}: {
+  payload: any
+  baseUrl: string
+  signal: AbortSignal
+}): Promise<string> {
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      baseUrl,
+      payload: { ...payload, stream: false },
+    }),
+    signal,
+    headers: { "Content-Type": "application/json" },
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => "")
+    throw new Error(`Upstream error: ${res.status} ${res.statusText} ${text ? `- ${text}` : ""}`)
+  }
+  try {
+    const data = await res.json()
+    const content =
+      data?.choices?.[0]?.message?.content ??
+      data?.choices?.[0]?.text ??
+      ""
+    return typeof content === "string" ? content : ""
+  } catch {
+    const text = await res.text().catch(() => "")
+    return text
   }
 }
 
@@ -609,6 +645,7 @@ export default function Page() {
   const [currentConvoId, setCurrentConvoId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
+  const runningRef = useRef<boolean>(false)
 
   // Load initial from localStorage
   useEffect(() => {
@@ -783,11 +820,19 @@ export default function Page() {
         },
       })
     } catch (e: any) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === newMsg.id ? { ...m, content: m.content + `\n\n[Error: ${e?.message ?? "stream failed"}]` } : m,
-        ),
-      )
+      // Fallback to non-streaming request
+      try {
+        const text = await nonStreamOpenAIChat({ payload, baseUrl, signal: controller.signal })
+        setMessages((prev) => prev.map((m) => (m.id === newMsg.id ? { ...m, content: text } : m)))
+      } catch (e2: any) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === newMsg.id
+              ? { ...m, content: (m.content || "") + `\n\n[Error: ${e2?.message ?? "request failed"}]` }
+              : m,
+          ),
+        )
+      }
     } finally {
       abortRef.current = null
     }
@@ -799,48 +844,44 @@ export default function Page() {
       abortRef.current = null
     }
     setRunning(false)
+    runningRef.current = false
   }
 
   async function runLoop(kind: Mode) {
     if (kind === "manual") return
 
-    setRunning(true)
     let speaker: BotId = currentSpeaker
-    while (true) {
-      if (!running && speaker === currentSpeaker) break // safety
+    while (runningRef.current) {
       await generateTurn(speaker)
       const next = speaker === "A" ? "B" : "A"
       setCurrentSpeaker(next)
 
       if (mode === "semi-auto") {
         // pause until user presses Step
+        runningRef.current = false
         setRunning(false)
         break
       }
 
       if (mode !== "full-auto") break
-
-      // loop continues unless stopped
-      if (abortRef.current === null) {
-        // finished a turn; check if still running
-        if (!running) break
-      }
       speaker = next
       await new Promise((r) => setTimeout(r, 50)) // yield
-      if (!running) break
+      if (!runningRef.current) break
     }
   }
 
   function handleStart() {
     if (mode === "manual") return
-    if (running) return
+    if (runningRef.current) return
+    runningRef.current = true
     setRunning(true)
     runLoop(mode)
   }
 
   function handleStep() {
     if (mode !== "semi-auto") return
-    if (running) return
+    if (runningRef.current) return
+    runningRef.current = true
     setRunning(true)
     runLoop("semi-auto")
   }
