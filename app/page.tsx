@@ -528,13 +528,15 @@ function MessageBubble({
   botA,
   botB,
   onEdit,
-  onCopy,
+    onCopy,
+    onDelete,
 }: {
   msg: Message
   botA: BotConfig
   botB: BotConfig
   onEdit: (id: string, content: string) => void
-  onCopy: (id: string) => void
+    onCopy: (id: string) => void
+    onDelete: (id: string) => void
 }) {
   const isA = msg.author === "A"
   const name = isA ? botA.name || "Bot A" : botB.name || "Bot B"
@@ -587,6 +589,21 @@ function MessageBubble({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Edit</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onDelete(msg.id)}
+                    aria-label="Delete message"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -916,6 +933,15 @@ export default function Page() {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)))
   }
 
+  function handleDeleteMessage(id: string) {
+    setMessages((prev) => prev.filter((m) => m.id !== id))
+    // Update next speaker based on the new last message
+    setCurrentSpeaker((prev) => {
+      const remaining = messages.filter((m) => m.id !== id)
+      return nextSpeakerFrom(remaining)
+    })
+  }
+
   // UI render
   const currentConvo = useMemo(
     () => conversations.find((c) => c.id === currentConvoId) || null,
@@ -1000,6 +1026,7 @@ export default function Page() {
                       botB={botB}
                       onEdit={handleEditMessage}
                       onCopy={() => {}}
+                      onDelete={handleDeleteMessage}
                     />
                   ))
                 )}
