@@ -1,3 +1,17 @@
+TODO:
+- [ ] Fix: inconsistencies with chats generating
+- [ ] Feat: Implement actual chat serialization so chats are saved
+- [ ] Fix: Make conversation delete button always visible (clip title)
+- [ ] UX: Move individual settings (temperature, model, etc.) for each LLM into button togglable panels OR:
+    - [ ] Move settings to the right maybe? Also could try compressing the chat while panels are open
+- [ ] UX: Automatically select the first and second models on new chats using models endpoint
+- [ ] UX: Add toasts for errors ('Failed to load models: {error_message}') and status ('loaded {#} models.')
+- [ ] UI: Add dark mode
+
+Extra Additions:
+- [ ] UX: Resizable chat history panel
+- [ ] UX: Hide chat history button
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
