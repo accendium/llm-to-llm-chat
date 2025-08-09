@@ -1,3 +1,35 @@
+## Run locally with LM Studio (local LLMs)
+
+1) Install LM Studio and start a local server
+- Download LM Studio and open the app
+- Go to “Server” and start the local OpenAI-compatible server
+- Note the Base URL (typically `http://127.0.0.1:1234`)
+
+2) Download models in LM Studio
+- Search and download any chat-capable models, e.g. `llama-2-7b-chat`
+- You can use any other model; the UI lists all available models from the server’s `/v1/models`
+- Make sure to load two models into the server
+
+3) Start this app
+```bash
+npm install
+npm run dev
+```
+Open `http://localhost:3000`
+
+4) In the app
+- Enter your LM Studio Base URL in the top right input (e.g., `http://127.0.0.1:1234`), then click the refresh icon
+- In each Bot card, pick a model (e.g., `llama-2-7b-chat` for Bot A and `llama-2-7b-chat:2` for Bot B)
+- Choose a mode: Full-auto, Semi-auto, or Manual
+- Click Start (or Step in Semi-auto) to generate turns; messages are stored in browser localStorage
+
+Notes
+- This app proxies requests via Next.js API routes to the LM Studio server
+- Streaming is used when available; if not, it falls back to non-streaming
+- No API keys are required for local LM Studio
+
+---
+
 TODO:
 - [ ] Fix: inconsistencies with chats generating
 - [ ] Feat: Implement actual chat serialization so chats are saved
@@ -14,7 +46,7 @@ Extra Additions:
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## Next.js Getting Started
 
 First, run the development server:
 
