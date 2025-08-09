@@ -799,7 +799,10 @@ export default function Page() {
       top_p: config.params.top_p,
       presence_penalty: config.params.presence_penalty,
       frequency_penalty: config.params.frequency_penalty,
-      max_tokens: config.params.max_tokens ?? undefined,
+      max_tokens:
+        typeof config.params.max_tokens === "number" && config.params.max_tokens > 0
+          ? config.params.max_tokens
+          : undefined,
       stream: true,
     }
 
@@ -811,14 +814,27 @@ export default function Page() {
     const controller = new AbortController()
     abortRef.current = controller
     try {
+      let produced = false
       await streamOpenAIChat({
         payload,
         baseUrl,
         signal: controller.signal,
         onToken: (delta) => {
+          if (delta && delta.length > 0) produced = true
           setMessages((prev) => prev.map((m) => (m.id === newMsg.id ? { ...m, content: m.content + delta } : m)))
         },
       })
+      // If stream ended with no tokens, try non-streaming fallback
+      if (!produced) {
+        try {
+          const text = await nonStreamOpenAIChat({ payload: { ...payload, stream: false }, baseUrl, signal: controller.signal })
+          if (text && text.length > 0) {
+            setMessages((prev) => prev.map((m) => (m.id === newMsg.id ? { ...m, content: text } : m)))
+          }
+        } catch {
+          // ignore, error path handled below in catch
+        }
+      }
     } catch (e: any) {
       // Fallback to non-streaming request
       try {
